@@ -21,7 +21,7 @@ pip install -r requirements.txt   # nainstalujeme knihovny
 Testy se pustí v rámci příkazového řádku:
 
 ```bash
-python -m pytest -q
+pytest -q
 ```
 
 Případně pro spuštění i s prohlížečem:
