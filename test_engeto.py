@@ -9,19 +9,16 @@ def accept_cookies_if_present(page: Page) -> None:
     """
     Zavře cookie dialog na engeto.cz, pokud se objeví.
     """
-    page.wait_for_timeout(500)
-
-    agree_main = page.get_by_role(
-        "button",
-        name=re.compile(r"chápu.*přijímám", re.I),
-    )
-
-    if agree_main.count() > 0:
-        try:
-            agree_main.first.click(timeout=2000)
-            return
-        except Exception:
-            pass
+    try:
+        accept_button = page.get_by_role(
+            "button",
+            name=re.compile(r"(chápu|souhlasím).*", re.I),
+        )
+        if accept_button.is_visible(timeout=3000):
+            accept_button.click()
+    except TimeoutError:
+        # Cookie banner se nezobrazil – pokračujeme
+        pass
 
 
 def open_homepage(page: Page) -> None:
@@ -30,33 +27,55 @@ def open_homepage(page: Page) -> None:
     accept_cookies_if_present(page)
 
 
-def test_homepage_loads_and_has_title(page: Page) -> None:
-    """Test 1: Ověří, že homepage jde otevřít a má neprázdný title."""
-    open_homepage(page)
-    expect(page).to_have_title(re.compile(r".+"))
-
-
-def test_navigation_contains_courses_link(page: Page) -> None:
+def test_homepage_loads_and_has_engeto_title(page: Page) -> None:
     """
-    Test 2: Ověří, že existuje odkaz "Kurzy" a že po kliknutí dojde k navigaci
-    na stránku s kurzy.
+    Test 1:
+    Ověří, že homepage ENGETO:
+    - se načte
+    - má v title značku ENGETO
+    - zůstane na homepage URL
+    """
+    open_homepage(page)
+
+    expect(page).to_have_url(re.compile(r"engeto\.cz/?$"))
+    expect(page).to_have_title(re.compile(r"ENGETO", re.I))
+
+
+def test_navigation_to_courses_page(page: Page) -> None:
+    """
+    Test 2:
+    Ověří, že klik na 'Kurzy' vede na stránku Přehled kurzů.
     """
     open_homepage(page)
 
     courses_link = page.get_by_role("link", name="Kurzy", exact=True)
     expect(courses_link).to_be_visible()
+
     courses_link.click()
 
-    expect(page).to_have_url(re.compile(r".*kurz.*", re.I))
+    expect(page).to_have_url(re.compile(r"/prehled-kurzu/?$"))
 
 
-def test_contact_or_cta_is_present(page: Page) -> None:
+def test_contact_or_primary_cta_is_present(page: Page) -> None:
     """
-    Test 3: Ověří, že stránka obsahuje viditelný prvek typu Kontakt.
+    Test 3:
+    Ověří, že stránka obsahuje alespoň jeden důležitý CTA prvek:
+    - Kontakt
+    - nebo Výukový portál / Akademie apod.
+
+    Test vždy obsahuje aserci - pokud nic nenajde, selže.
     """
     open_homepage(page)
 
-    contact_link = page.get_by_role("link", name=re.compile(r"kontakt", re.I))
-    if contact_link.count() > 0:
-        expect(contact_link.first).to_be_visible()
-        return
+    possible_cta = page.get_by_role(
+        "link",
+        name=re.compile(
+            r"(kontakt|výukový portál|akademie)",
+            re.I,
+        ),
+    )
+
+    expect(
+        possible_cta.first,
+        "Na stránce nebyl nalezen žádný očekávaný kontakt/CTA prvek",
+    ).to_be_visible()
