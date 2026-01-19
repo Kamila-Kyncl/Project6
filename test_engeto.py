@@ -7,18 +7,39 @@ BASE_URL = "https://engeto.cz/"
 
 def accept_cookies_if_present(page: Page) -> None:
     """
-    Zavře cookie dialog na engeto.cz, pokud se objeví.
+    Zavře cookie dialog (CookieScript) pokud se objeví.
+    Zamezí tomu, aby overlay blokoval klikání na UI.
     """
+    wrapper = page.locator("#cookiescript_injected_wrapper")
+
     try:
-        accept_button = page.get_by_role(
+        # Počkej krátce, jestli se dialog vůbec objeví
+        wrapper.wait_for(state="visible", timeout=3000)
+
+        # Zkus najít a kliknout na hlavní tlačítko souhlasu
+        accept_btn = wrapper.get_by_role(
             "button",
-            name=re.compile(r"(chápu|souhlasím).*", re.I),
+            name=re.compile(r"(chápu|přijímám|souhlasím)", re.I),
         )
-        if accept_button.is_visible(timeout=3000):
-            accept_button.click()
+
+        # V CookieScriptu může být víc buttonů – vezmeme první viditelný
+        accept_btn.first.click(timeout=3000)
+        return
+
     except TimeoutError:
-        # Cookie banner se nezobrazil – pokračujeme
-        pass
+        # banner se neukázal
+        return
+
+    except Exception:
+        # fallback: ESC někdy zavře modal
+        page.keyboard.press("Escape")
+
+        # pokud overlay pořád existuje, poslední záchrana = odstranit z DOM
+        try:
+            if wrapper.is_visible():
+                wrapper.evaluate("el => el.remove()")
+        except Exception:
+            pass
 
 
 def open_homepage(page: Page) -> None:
